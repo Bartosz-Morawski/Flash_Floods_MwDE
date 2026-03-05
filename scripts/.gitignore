@@ -1,0 +1,12 @@
+# IDEs (PyCharm / IntelliJ)
+.idea/
+*.iml
+
+# Python Cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environments (just in case you add one later)
+venv/
+env/
