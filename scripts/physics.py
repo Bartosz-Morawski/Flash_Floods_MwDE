@@ -96,10 +96,19 @@ def gaussian_initial_condition(
     if ic.sigma <= 0: raise ValueError("sigma must be positive.")
     return ic.A_base + ic.A_amp * np.exp(-((s - ic.s0) ** 2) / (2.0 * ic.sigma ** 2))
 
+
 def wave_speed_rectangular(A: np.ndarray, *, phys: PhysicalParams, w: float) -> np.ndarray:
     """
-    Calculate the characteristic wave speed v(A) = Q'(A) for a rectangular canyon.
-    For Q(A) = K * A^(3/2) / sqrt(w), the derivative is (3/2) * K * A^(1/2) / sqrt(w).
+    Calculate the exact characteristic wave speed v(A) = Q'(A) for a rectangular canyon.
+    Using the full wetted perimeter l(A) = w + 2A/w.
     """
     A_pos = np.maximum(np.asarray(A, dtype=float), 0.0)
-    return (3.0 / 2.0) * phys.K * (A_pos ** 0.5) / np.sqrt(w)
+
+    # Calculate exact wetted perimeter
+    l_A = w + (2.0 * A_pos) / w
+
+    # Calculate exact derivative Q'(A)
+    term1 = 1.5 * np.sqrt(A_pos) / np.sqrt(l_A)
+    term2 = (A_pos ** 1.5) / (w * (l_A ** 1.5))
+
+    return phys.K * (term1 - term2)

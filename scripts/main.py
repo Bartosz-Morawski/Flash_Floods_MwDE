@@ -2,7 +2,7 @@
 main.py
 
 Entry point for the flash-flood Godunov simulation.
-Generates diagnostics and report-ready plots.
+Generates diagnostics and plots.
 """
 
 import numpy as np

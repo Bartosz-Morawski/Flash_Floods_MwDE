@@ -116,10 +116,12 @@ This plot clearly shows the **sudden arrival of a flood wall**, despite smooth u
 ### Intersecting Characteristics
 A characteristic diagram in the \((s,t)\) plane illustrating how trajectories corresponding to deeper water intersect those ahead of them.  
 This intersection marks the **breakdown of the classical solution** and the formation of a shock.
+These calculations have nothing to do with the Godunov method, they are analytical and are there to support the validity of the Godunov simulation.
 
 ### Shock Trajectory Validation
 Compares the numerically computed shock position with the theoretical propagation speed given by the **Rankine–Hugoniot jump condition**, demonstrating excellent agreement and validating the Godunov scheme.
-
+Numerically, the shock is found by looking for the most negative value of $(\frac{\partial A}{\partial s})$. This will reflect the most negative slope of A and should approximate the location of the shock well.
+Analytically, we integrate the Rankine-Hugoniot condition by using the steepest peak of A at the given time for A_l and A_base = 5m^2 for A_r.
 ---
 
 # 🔬 Numerical Method
