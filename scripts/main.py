@@ -7,27 +7,44 @@ Generates diagnostics and plots.
 
 import numpy as np
 from params import DomainParams, TimeParams, PhysicalParams, InitialConditionParams
-from physics import l_rectangular, flux_Q, gaussian_initial_condition, wave_speed_rectangular
-from solver import run_simulation
+from physics import l_rectangular, flux_Q, gaussian_initial_condition, wave_speed_rectangular, calculate_breaking_time
+from solver import run_simulation, run_simulation_infiltration
 import plotting
 
 def main() -> None:
     # 1. Setup Configuration
+    USE_INFILTRATION = False
     domain = DomainParams(L=50_000.0, N=1000)
     time = TimeParams(dt=5.0, T=14_400.0) # 4 Hours
-    phys = PhysicalParams(g=9.81, sin_alpha=0.01, f=0.02)
-    ic = InitialConditionParams(A_base=5.0, A_amp=20.0, s0=3_000.0, sigma=500.0)
-    w_rect = 20.0 # Box canyon width
+    phys = PhysicalParams(g=9.81, sin_alpha=0.008, f=0.04)
+    ic = InitialConditionParams(A_base=5, A_amp=20, s0=3_000.0, sigma=500.0)
+    w_rect = 20 #20.0 # Box canyon width
 
     # 2. Define the baseline flux function (Rectangular Box Canyon)
     def flux_rect(A_in: np.ndarray) -> np.ndarray:
         return flux_Q(A_in, phys=phys, l_of_A=lambda a: l_rectangular(a, w=w_rect))
 
-    # 3. Run the baseline simulation
-    print("Running Godunov Simulation...")
-    out = run_simulation(
-        domain=domain, time=time, ic=ic, flux_func=flux_rect, store_every=20
-    )
+    # 3. Run the simulation based on the switch
+    if USE_INFILTRATION:
+        print("Running Godunov Simulation WITH Soil Infiltration...")
+        out = run_simulation_infiltration(
+            domain=domain,
+            time=time,
+            ic=ic,
+            phys=phys,  # The infiltration solver needs phys...
+            w_rect=w_rect,  # ...and w_rect to calculate the wetted perimeter
+            flux_func=flux_rect,
+            store_every=20
+        )
+    else:
+        print("Running Baseline Godunov Simulation (No Infiltration)...")
+        out = run_simulation(
+            domain=domain,
+            time=time,
+            ic=ic,
+            flux_func=flux_rect,
+            store_every=20
+        )
 
     print("=== Godunov Flash Flood Baseline ===")
     print(f"L = {domain.L/1000:.1f} km, N = {domain.N}, ds = {domain.ds:.3f} m")
@@ -45,7 +62,7 @@ def main() -> None:
     # 5. Generate the Flood Hydrograph (Observer standing 30km downstream)
     plotting.plot_hydrograph(
         out,
-        target_s=30_000.0,
+        target_s=8_000.0,
         title="Flood Hydrograph"
     )
 
@@ -57,8 +74,17 @@ def main() -> None:
     # Calculate how fast each point of water is moving
     wave_speeds = wave_speed_rectangular(A_init, phys=phys, w=w_rect)
 
+    # Calculate exact breaking time (t_star) using our physics module
+    t_star = calculate_breaking_time(out["A"][0], out["s"], phys=phys, w=w_rect)
+
     plotting.plot_characteristics(
-        P_vals, wave_speeds, t_max=time.T, title="Intersecting Characteristics (Proof of Shock)"
+        P_vals=P_vals,
+        wave_speeds=wave_speeds,
+        t_max=time.T,
+        t_star=t_star,
+        t_shock=out["t"],
+        s_shock=None,  # Set to None temporarily if s_RH isn't defined here yet
+        title="Intersecting Characteristics & Shock Formation"
     )
 
     # 7. Compare Numerical Shock to Theoretical Rankine-Hugoniot Trajectory

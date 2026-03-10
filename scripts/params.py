@@ -28,6 +28,7 @@ class PhysicalParams:
     g: float = 9.81
     sin_alpha: float = 0.01
     f: float = 0.02
+    K_inf: float = 1.38e-6  # ~5 mm/hr for poorly drained desert soil
 
     def __post_init__(self):
         if self.f <= 0: raise ValueError("f must be positive.")
@@ -126,3 +127,4 @@ class InitialConditionParams:
     A_amp: float = 20.0
     s0: float = 3_000.0
     sigma: float = 500.0
+

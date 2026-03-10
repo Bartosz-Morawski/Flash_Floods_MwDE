@@ -112,3 +112,73 @@ def wave_speed_rectangular(A: np.ndarray, *, phys: PhysicalParams, w: float) -> 
     term2 = (A_pos ** 1.5) / (w * (l_A ** 1.5))
 
     return phys.K * (term1 - term2)
+
+
+# def calculate_breaking_time(
+#         A0: np.ndarray,
+#         s: np.ndarray,
+#         *,
+#         phys: PhysicalParams,
+#         w: float
+# ) -> float:
+#     """
+#     Calculate the exact time t* of gradient catastrophe (wave breaking)
+#     where the characteristics first intersect.
+#
+#     Parameters
+#     ----------
+#     A0:
+#         Initial wetted cross-sectional area(s) [m^2].
+#     s:
+#         Spatial locations [m].
+#     phys:
+#         Physical parameters.
+#     w:
+#         Channel width [m].
+#
+#     Returns
+#     -------
+#     float
+#         Breaking time t* [s]. Returns np.inf if the wave never breaks.
+#     """
+#     # 1. Calculate initial wave speed using our existing exact function
+#     v0 = wave_speed_rectangular(A0, phys=phys, w=w)
+#
+#     # 2. Calculate the spatial gradient of the velocity
+#     dv0_ds = np.gradient(v0, s)
+#     min_grad = np.min(dv0_ds)
+#
+#     # 3. Calculate breaking time
+#     if min_grad < 0.0:
+#         return float(-1.0 / min_grad)
+#     else:
+#         return float(np.inf)
+
+def calculate_breaking_time(
+        A0: np.ndarray,
+        s: np.ndarray,
+        *,
+        phys: PhysicalParams,
+        w: float
+) -> float:
+    """
+    Calculate the exact time t* of gradient catastrophe by finding
+    the absolute first point where two adjacent characteristic lines intersect.
+    """
+    # 1. Calculate initial wave speeds
+    v0 = wave_speed_rectangular(A0, phys=phys, w=w)
+
+    # 2. Calculate distance (P2 - P1) and speed differences (v1 - v2)
+    # between all adjacent points on the grid
+    ds = np.diff(s)
+    dv = v0[:-1] - v0[1:]
+
+    # 3. We only care about points that are crashing into each other (v1 > v2)
+    converging = dv > 0
+
+    # 4. Calculate all intersection times and find the earliest one
+    if np.any(converging):
+        t_crossings = ds[converging] / dv[converging]
+        return float(np.min(t_crossings))
+    else:
+        return float(np.inf)  # Wave never breaks
