@@ -110,3 +110,81 @@ def run_simulation(
             k += 1
 
     return {"s": s, "t": t_hist[:k], "A": A_hist[:k]}
+
+import numpy as np
+from typing import Dict, Callable
+
+
+def run_simulation_infiltration(
+        domain: 'DomainParams',
+        time: 'TimeParams',
+        ic: 'InitialConditionParams',
+        phys: 'PhysicalParams',
+        w_rect: float,
+        flux_func: Callable,
+        store_every: int = 10
+) -> Dict[str, np.ndarray]:
+    """
+    Solves the Kinematic Wave Equation WITH a soil infiltration sink term
+    using Operator Splitting (Godunov Advection + Explicit Sink).
+    """
+    # 1. Setup Grid and Arrays (Same as your original solver)
+    s = np.linspace(0.0, domain.L, domain.N)
+    ds = s[1] - s[0]
+    dt = time.dt
+    Nt = int(time.T / dt)
+
+    # Initialize A array
+    from scripts.physics import gaussian_initial_condition
+    A = gaussian_initial_condition(s, ic=ic)
+    # Storage arrays
+    store_count = Nt // store_every + 1
+    A_hist = np.zeros((store_count, domain.N))
+    t_hist = np.zeros(store_count)
+
+    A_hist[0, :] = A.copy()
+    t_hist[0] = 0.0
+    store_idx = 1
+
+    # 2. The Fractional Step Time Loop
+    for n in range(1, Nt + 1):
+
+        # --- STEP A: Godunov Advection (Move the water) ---
+        # Calculate fluxes at cell interfaces (Upwind scheme)
+        F = np.zeros(domain.N + 1)
+        for i in range(1, domain.N):
+            F[i] = flux_func(A[i - 1])
+
+            # Boundary conditions
+        F[0] = flux_func(ic.A_base)  # Trickle coming in
+        F[-1] = F[-2]  # Outflow boundary
+
+        # Intermediate update (A_star)
+        A_star = np.zeros_like(A)
+        for i in range(domain.N):
+            A_star[i] = A[i] - (dt / ds) * (F[i + 1] - F[i])
+
+        # --- STEP B: Soil Infiltration (Drain the water) ---
+        # Calculate wetted perimeter: l(A) = w + 2A/w
+        l_A = w_rect + (2.0 * A_star) / w_rect
+
+        # Calculate the sink volume: I(A) = K_inf * l(A)
+        sink_term = phys.K_inf * l_A
+
+        # Update Area
+        A_new = A_star - (dt * sink_term)
+
+        # CRITICAL FIX: Prevent the "Dry Bed Singularity"
+        # We cannot let the soil drain the river below our baseline trickle
+        A_new = np.maximum(A_new, ic.A_base)
+
+        # Overwrite A for the next loop
+        A = A_new.copy()
+
+        # Store results
+        if n % store_every == 0 or n == Nt:
+            A_hist[store_idx, :] = A.copy()
+            t_hist[store_idx] = n * dt
+            store_idx += 1
+
+    return {"t": t_hist[:store_idx], "s": s, "A": A_hist[:store_idx, :]}
